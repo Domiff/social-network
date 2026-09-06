@@ -2,8 +2,15 @@ from fastcrud import FastCRUD, JoinConfig
 from fastcrud.types import GetMultiResponseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.chat.models import Chat, Message
-from src.chat.schemas import ChatIn, ChatOut, MessageIn, MessageOut
+from src.chat.models import Chat, ChatMember, Message
+from src.chat.schemas import (
+    ChatIn,
+    ChatOut,
+    MemberIn,
+    MemberOut,
+    MessageIn,
+    MessageOut,
+)
 from src.core.database import BaseRepository, SessionDep
 
 
@@ -119,9 +126,72 @@ class MessageRepository(BaseRepository):
         )
 
 
+class ChatMemberRepository(BaseRepository):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.chat_member_crud = FastCRUD(ChatMember)
+
+    async def create(self, chat_id: int, data: MemberIn) -> MemberOut:
+        return await self.chat_member_crud.create(
+            db=self.session,
+            object=data.model_copy(update={"chat_id": chat_id}),
+            schema_to_select=MemberOut,
+            return_as_model=True,
+        )
+
+    async def list(self, chat_id: int) -> GetMultiResponseModel[MemberOut]:
+        return await self.chat_member_crud.get_multi(
+            db=self.session,
+            chat_id=chat_id,
+            sort_columns="id",
+            sort_orders="asc",
+            schema_to_select=MemberOut,
+            return_as_model=True,
+        )
+
+    async def detail(self, chat_id: int, user_id: int) -> MemberOut | None:
+        return await self.chat_member_crud.get(
+            db=self.session,
+            chat_id=chat_id,
+            user_id=user_id,
+            schema_to_select=MemberOut,
+            return_as_model=True,
+        )
+
+    async def exists(self, chat_id: int, user_id: int) -> bool:
+        return await self.chat_member_crud.exists(
+            db=self.session,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+
+    async def update(
+        self, chat_id: int, user_id: int, data: MemberIn
+    ) -> MemberOut | None:
+        return await self.chat_member_crud.update(
+            db=self.session,
+            object=data,
+            schema_to_select=MemberOut,
+            return_as_model=True,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+
+    async def delete(self, chat_id: int, user_id: int) -> None:
+        return await self.chat_member_crud.db_delete(
+            db=self.session,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+
+
 def get_chat_repository(session: SessionDep) -> ChatRepository:
     return ChatRepository(session)
 
 
 def get_message_repository(session: SessionDep) -> MessageRepository:
     return MessageRepository(session)
+
+
+def get_chat_member_repository(session: SessionDep) -> ChatMemberRepository:
+    return ChatMemberRepository(session)

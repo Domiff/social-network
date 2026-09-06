@@ -1,3 +1,4 @@
+from src.chat.enums import ChatRole
 from src.core.schemas import BaseSchema, DateTimeSchema
 
 
@@ -22,3 +23,16 @@ class ChatOut(BaseSchema, DateTimeSchema):
     type: str
     name: str | None = None
     messages: list[MessageOut] = []
+
+
+class MemberIn(BaseSchema):
+    user_id: int | None = None
+    chat_id: int | None = None
+    role: ChatRole | None = None
+
+
+class MemberOut(BaseSchema, DateTimeSchema):
+    id: int
+    chat_id: int
+    user_id: int
+    role: str
