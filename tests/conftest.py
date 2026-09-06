@@ -7,10 +7,17 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from src.auth.depends import get_current_user
 from src.auth.repository import get_user_repo
 from src.auth.service import AuthService, get_auth_service
+from src.chat.repositories import (
+    get_chat_member_repository,
+    get_chat_repository,
+    get_message_repository,
+)
 from src.core.database import Base, get_session
 from src.core.setup import create_app
+from tests.factories import make_user_schema
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -57,6 +64,21 @@ def user_repo(session):
 
 
 @pytest.fixture
+def chat_repo(session):
+    return get_chat_repository(session)
+
+
+@pytest.fixture
+def message_repo(session):
+    return get_message_repository(session)
+
+
+@pytest.fixture
+def member_repo(session):
+    return get_chat_member_repository(session)
+
+
+@pytest.fixture
 def auth_service(session):
     return AuthService(session)
 
@@ -66,4 +88,13 @@ async def client(session, auth_service):
     app = create_app()
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_auth_service] = lambda: auth_service
+    yield AsyncClient(transport=ASGITransport(app=app), base_url="https://testserver")
+
+
+@pytest.fixture
+async def authorized_client(session, auth_service):
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[get_auth_service] = lambda: auth_service
+    app.dependency_overrides[get_current_user] = make_user_schema
     yield AsyncClient(transport=ASGITransport(app=app), base_url="https://testserver")
