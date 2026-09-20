@@ -75,6 +75,24 @@ class AdminSettings(AppSettings):
     ADMIN_SECRET_KEY: str
 
 
+class RedisSettings(AppSettings):
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    CONNECTION_POOL_MAXSIZE: int = 10
+    EXPIRE: int = 60 * 60
+
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(
+            self, "REDIS_HOST", "redis" if self.IS_DOCKERIZED else "localhost"
+        )
+        object.__setattr__(
+            self,
+            "REDIS_URL",
+            f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}",
+        )
+
+
 class Settings(AppSettings):
     app: AppSettings = AppSettings()
     db: DBSettings = DBSettings()
@@ -83,6 +101,7 @@ class Settings(AppSettings):
     http: HTTPSettings = HTTPSettings()
     s3: S3Settings = S3Settings()
     admin: AdminSettings = AdminSettings()
+    redis: RedisSettings = RedisSettings()
 
 
 settings = Settings()
