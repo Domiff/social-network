@@ -27,7 +27,8 @@ async def create_member(
     repo: ChatMemberRepositoryDep,
 ) -> MemberOut:
     try:
-        return await repo.create(chat_id=chat_id, data=data)
+        data.chat_id = chat_id
+        return await repo.create(data=data)
     except IntegrityError as e:
         raise AlreadyExists("Member already exists") from e
 

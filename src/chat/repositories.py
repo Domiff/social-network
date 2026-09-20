@@ -131,10 +131,10 @@ class ChatMemberRepository(BaseRepository):
         super().__init__(session)
         self.chat_member_crud = FastCRUD(ChatMember)
 
-    async def create(self, chat_id: int, data: MemberIn) -> MemberOut:
+    async def create(self, data: MemberIn) -> MemberOut:
         return await self.chat_member_crud.create(
             db=self.session,
-            object=data.model_copy(update={"chat_id": chat_id}),
+            object=data,
             schema_to_select=MemberOut,
             return_as_model=True,
         )
