@@ -5,12 +5,14 @@ from src.core.schemas import BaseSchema, DateTimeSchema
 class MessageIn(BaseSchema):
     text: str | None = None
     chat_id: int | None = None
+    sender_id: int
 
 
 class MessageOut(BaseSchema, DateTimeSchema):
     id: int
     text: str
     chat_id: int
+    sender_id: int
 
 
 class ChatIn(BaseSchema):
