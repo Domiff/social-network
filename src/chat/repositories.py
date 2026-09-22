@@ -81,10 +81,10 @@ class MessageRepository(BaseRepository):
         super().__init__(session)
         self.message_crud = FastCRUD(Message)
 
-    async def create(self, chat_id: int, data: MessageIn) -> MessageOut:
+    async def create(self, data: MessageIn) -> MessageOut:
         return await self.message_crud.create(
             db=self.session,
-            object=data.model_copy(update={"chat_id": chat_id}),
+            object=data,
             schema_to_select=MessageOut,
             return_as_model=True,
         )
