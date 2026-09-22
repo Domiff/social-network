@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, Security
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.exc import NoResultFound
 
 from src.auth.exceptions import Unauthorized
@@ -21,7 +21,7 @@ def get_user_repo_dep(session: SessionDep) -> UserRepository:
     return get_user_repo(session)
 
 
-TokenDep = Annotated[str, Security(token_schema)]
+TokenDep = Annotated[HTTPAuthorizationCredentials, Security(token_schema)]
 JWTDep = Annotated[JWT, Depends(get_jwt)]
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repo_dep)]
 
@@ -31,7 +31,7 @@ async def get_current_user(
     jwt: JWTDep,
     user_repo: UserRepositoryDep,
 ) -> UserSchema:
-    payload = jwt.get_payload(token)
+    payload = jwt.get_payload(token.credentials)
     if not payload:
         raise Unauthorized()
     user_id: str = payload.get("sub")
