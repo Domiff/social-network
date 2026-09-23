@@ -76,6 +76,9 @@ class RedisPubSub(BaseRedis):
         await self._do(self.redis.publish, channel, payload)
         self.logger.info("User publish to channel", channel=channel)
 
+    async def close(self) -> None:
+        await self._do(self.pubsub.aclose)
+
     async def listen(self) -> AsyncIterator[dict]:
         try:
             async for message in self.pubsub.listen():

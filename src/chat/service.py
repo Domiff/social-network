@@ -82,6 +82,7 @@ class ChatService:
         finally:
             chat_task.cancel()
             await self.leave(chat_id=chat_id)
+            await self.pubsub.close()
             await self.disconnect()
 
     def _channel_builder(self, chat_id: str):
