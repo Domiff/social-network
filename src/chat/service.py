@@ -3,18 +3,21 @@ import asyncio
 from fastapi.websockets import WebSocketDisconnect, WebSocketState, WebSocket
 
 from src.core.database import new_session
-from src.core.redis import get_pubsub, RedisPubSub
+from src.core.redis import get_pubsub, RedisPubSub, get_cache, RedisCache, key_builder
 from src.core.logging import get_logger
 from src.chat.schemas import MemberIn, MessageIn
 from src.chat.repositories import ChatMemberRepository, MessageRepository
 
 
 class ChatService:
+    CHAT_PREFIX = "chat"
+    MEMBER_PREFIX = "member"
+
     def __init__(self, ws: WebSocket):
         self.ws: WebSocket = ws
         self.pubsub: RedisPubSub = get_pubsub()
+        self.cache: RedisCache = get_cache()
         self.logger = get_logger("chat_service")
-        self.member_id: int | None = None
 
     async def connect(self):
         await self.ws.accept()
@@ -32,24 +35,35 @@ class ChatService:
                 member = await repo.create(
                     data=MemberIn(user_id=user_id, chat_id=int(chat_id))
                 )
-            self.member_id = member.id
+        await self.cache.set(
+            key_builder(self.MEMBER_PREFIX, f"{member.id}"),
+            member.id,
+        )
         await self.pubsub.subscribe(self._channel_builder(chat_id))
 
     async def leave(self, chat_id: str):
         user_id = self.ws.user.id
         async with new_session() as session:
+            member = await ChatMemberRepository(session).detail(chat_id=int(chat_id), user_id=user_id)
             await ChatMemberRepository(session).delete(
                 user_id=user_id,
                 chat_id=int(chat_id),
             )
+        await self.cache.delete(
+            key_builder(self.MEMBER_PREFIX, f"{member.id}"),
+        )
         await self.pubsub.unsubscribe(self._channel_builder(chat_id))
 
     async def send(self, chat_id: str, text: str | bytes):
         async with new_session() as session:
+            member = await ChatMemberRepository(session).detail(chat_id=int(chat_id), user_id=self.ws.user.id)
+            member_id = await self.cache.get(
+                key_builder(self.MEMBER_PREFIX, f"{member.id}"),
+            )
             message = MessageIn(
                 text=str(text),
                 chat_id=int(chat_id),
-                sender_id=self.member_id,
+                sender_id=int(member_id),
             )
             await MessageRepository(session).create(data=message)
         await self.pubsub.publish(self._channel_builder(chat_id), str(text))
@@ -71,7 +85,7 @@ class ChatService:
             await self.disconnect()
 
     def _channel_builder(self, chat_id: str):
-        return self.pubsub.key_builder("chat", f"{chat_id}")
+        return key_builder(self.CHAT_PREFIX, f"{chat_id}")
 
     async def _from_redis(self):
         async for message in self.pubsub.listen():
