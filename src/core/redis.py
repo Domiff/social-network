@@ -18,10 +18,6 @@ class BaseRedis:
         self.redis: Redis = redis
         self.logger = get_logger(self.__class__.__name__)
 
-    @staticmethod
-    def key_builder(prefix: str, key: str) -> str:
-        return f"{prefix}:{key}"
-
     async def _do(
         self, func: Callable[..., Awaitable[Any] | Any], *args, **kwargs
     ) -> Any:
@@ -94,6 +90,10 @@ class RedisPubSub(BaseRedis):
                 "Redis operation failed", operation="listen", error=str(e)
             )
             raise
+
+
+def key_builder(prefix: str, key: str) -> str:
+    return f"{prefix}:{key}"
 
 
 @lru_cache
