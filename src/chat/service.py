@@ -26,49 +26,55 @@ class ChatService:
         if self.ws.client_state is WebSocketState.CONNECTED:
             await self.ws.close()
 
-    async def join(self, chat_id: str) -> int | None:
+    async def join(self, chat_id: int) -> None:
         user_id = self.ws.user.id
         async with new_session() as session:
             repo = ChatMemberRepository(session)
-            member = await repo.detail(chat_id=int(chat_id), user_id=user_id)
+            member = await repo.detail(chat_id=chat_id, user_id=user_id)
             if member is None:
                 member = await repo.create(
-                    data=MemberIn(user_id=user_id, chat_id=int(chat_id))
+                    data=MemberIn(user_id=user_id, chat_id=chat_id)
                 )
         await self.cache.set(
-            key_builder(self.MEMBER_PREFIX, f"{member.id}"),
+            key_builder(self.MEMBER_PREFIX, member.id),
             member.id,
         )
         await self.pubsub.subscribe(self._channel_builder(chat_id))
 
-    async def leave(self, chat_id: str):
+    async def leave(self, chat_id: int) -> None:
         user_id = self.ws.user.id
         async with new_session() as session:
-            member = await ChatMemberRepository(session).detail(chat_id=int(chat_id), user_id=user_id)
+            member = await ChatMemberRepository(session).detail(chat_id=chat_id, user_id=user_id)
             await ChatMemberRepository(session).delete(
                 user_id=user_id,
-                chat_id=int(chat_id),
+                chat_id=chat_id,
             )
-        await self.cache.delete(
-            key_builder(self.MEMBER_PREFIX, f"{member.id}"),
-        )
+        if member is not None:
+            await self.cache.delete(
+                key_builder(self.MEMBER_PREFIX, member.id),
+            )
         await self.pubsub.unsubscribe(self._channel_builder(chat_id))
 
-    async def send(self, chat_id: str, text: str | bytes):
+    async def send(self, chat_id: int, text: str) -> None:
+        user_id = self.ws.user.id
         async with new_session() as session:
-            member = await ChatMemberRepository(session).detail(chat_id=int(chat_id), user_id=self.ws.user.id)
-            member_id = await self.cache.get(
-                key_builder(self.MEMBER_PREFIX, f"{member.id}"),
-            )
+            member = await ChatMemberRepository(session).detail(chat_id=chat_id, user_id=user_id)
+            if member is None:
+                self.logger.warning(
+                    "Message dropped: user is not a chat member",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                )
+                return
             message = MessageIn(
-                text=str(text),
-                chat_id=int(chat_id),
-                sender_id=int(member_id),
+                text=text,
+                chat_id=chat_id,
+                sender_id=member.id,
             )
             await MessageRepository(session).create(data=message)
-        await self.pubsub.publish(self._channel_builder(chat_id), str(text))
+        await self.pubsub.publish(self._channel_builder(chat_id), text)
 
-    async def run(self, chat_id: str) -> None:
+    async def run(self, chat_id: int) -> None:
         await self.connect()
         await self.join(chat_id)
 
@@ -85,10 +91,10 @@ class ChatService:
             await self.pubsub.close()
             await self.disconnect()
 
-    def _channel_builder(self, chat_id: str):
-        return key_builder(self.CHAT_PREFIX, f"{chat_id}")
+    def _channel_builder(self, chat_id: int) -> str:
+        return key_builder(self.CHAT_PREFIX, chat_id)
 
-    async def _from_redis(self):
+    async def _from_redis(self) -> None:
         async for message in self.pubsub.listen():
             if message["type"] == "message":
                 await self.ws.send_text(message["data"])

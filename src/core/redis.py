@@ -43,12 +43,12 @@ class RedisCache(BaseRedis):
         await self._do(self.redis.set, key, value, ex=expire)
         self.logger.info("redis_set", redis_key=key)
 
-    async def get(self, key: str) -> str | bytes | None:
+    async def get(self, key: str) -> str | None:
         value = await self._do(self.redis.get, key)
-        if value:
-            self.logger.info("redis_get", redis_key=key)
-            return value
-        return None
+        if value is None:
+            return None
+        self.logger.info("redis_get", redis_key=key)
+        return value
 
     async def expire(self, key: str) -> None:
         await self._do(self.redis.expire, key, settings.redis.EXPIRE)
@@ -95,7 +95,7 @@ class RedisPubSub(BaseRedis):
             raise
 
 
-def key_builder(prefix: str, key: str) -> str:
+def key_builder(prefix: str, key: str | int) -> str:
     return f"{prefix}:{key}"
 
 

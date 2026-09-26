@@ -17,4 +17,4 @@ async def chat(ws: WebSocket, chat_id: int, token: str):
         ws.scope["user"] = await get_user_repo(session).get_by_id(int(payload["sub"]))
 
     service = ChatService(ws)
-    await service.run(str(chat_id))
+    await service.run(chat_id)
